@@ -2,6 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const feeds = require('./datafeeds');
 
 const ROOT = __dirname;
 
@@ -110,6 +111,8 @@ function loadEnvFile(filePath) {
   }
 }
 
+const PRIVATE_PATHS = new Set(['data', 'node_modules', 'portal.js', 'datafeeds.js', 'package.json', 'package-lock.json', 'ecosystem.config.js']);
+
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -130,6 +133,15 @@ function send(res, status, body, headers = {}) {
 
 const server = http.createServer((req, res) => {
   let urlPath = decodeURIComponent(req.url.split('?')[0]);
+
+  if ((urlPath === '/api/fuel' || urlPath.startsWith('/api/hw/')) && req.method === 'GET') {
+    const force = req.url.includes('refresh=1');
+    const feed = urlPath === '/api/fuel' ? feeds.getFuel(force) : feeds.getHw(urlPath.slice('/api/hw/'.length), force);
+    if (!feed) return sendJson(res, 404, { error: 'Unknown category' });
+    return feed
+      .then((result) => sendJson(res, 200, { updatedAt: new Date(result.time).toISOString(), stale: result.stale, ...result.data }))
+      .catch(() => sendJson(res, 502, { error: 'Upstream price source unavailable' }));
+  }
 
   if (urlPath === '/api/notifications' && req.method === 'GET') {
     return handleGetNotifications(res);
@@ -152,6 +164,11 @@ const server = http.createServer((req, res) => {
   const filePath = path.normalize(path.join(ROOT, urlPath));
   if (!filePath.startsWith(ROOT)) {
     return send(res, 403, 'Forbidden');
+  }
+  // Only front-end files are public: never .env, server code, data/ or git files.
+  const relPath = path.relative(ROOT, filePath).split(path.sep);
+  if (relPath[0].startsWith('.') || PRIVATE_PATHS.has(relPath[0])) {
+    return send(res, 404, 'Not found');
   }
 
   fs.readFile(filePath, (err, data) => {

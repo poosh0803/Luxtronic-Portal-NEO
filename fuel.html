@@ -3,129 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fuel Prices</title>
-    <link rel="stylesheet" href="fuel.css">
+    <title>Fuel Prices - Luxtronic Portal NEO</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="base.css">
+    <link rel="stylesheet" href="pricepages.css">
     <link rel="icon" type="image/png" href="icons/luxtronic.png">
+    <script>
+        try { if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark-mode'); } catch {}
+    </script>
 </head>
 <body>
-    <div class="container">
-        <a class="back-link" href="index.html">&larr; Back to Portal</a>
-        <h1>Fuel Prices</h1>
-        <p class="subtitle">Live fuel prices by region</p>
-        <div class="region-select">
-            <label for="region">Region: </label>
-            <select id="region" disabled></select>
+    <header class="header">
+        <a class="brand" href="/" title="Back to portal">
+            <span class="logo-box"><img src="icons/luxtronic.png" alt="Luxtronic"></span>
+            <span class="brand-name">Luxtronic Portal</span>
+            <span class="tagline"><i class="fas fa-chevron-right"></i> Fuel Prices</span>
+        </a>
+        <div class="header-actions">
+            <a class="header-link" href="/" title="Back to portal" aria-label="Back to portal"><i class="fas fa-house"></i></a>
+            <button id="darkModeToggle" class="icon-btn" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">
+                <i id="themeIcon" class="fas fa-moon"></i>
+            </button>
         </div>
-        <div class="table-wrap">
-            <div id="fuel-table"><p class="status-message">Loading fuel prices&hellip;</p></div>
-        </div>
-        <div id="pagination"></div>
-    </div>
-    <script>
-    const apiUrl = "https://projectzerothree.info/api.php?format=json";
-    let fuelData = null;
-    let groupedRegions = {};
-    let currentRegion = '';
-    let currentPage = 0;
-    const regionSelect = document.getElementById('region');
-    const paginationDiv = document.getElementById('pagination');
+    </header>
 
-        function groupRegions() {
-            groupedRegions = {};
-            for (const regionObj of fuelData.regions) {
-                // Group by region name before any dash (e.g., NSW, VIC)
-                const base = regionObj.region.split('-')[0];
-                if (!groupedRegions[base]) groupedRegions[base] = [];
-                groupedRegions[base].push(regionObj);
-            }
-        }
+    <main class="page">
+        <section class="box">
+            <div class="box-title toolbar-row">
+                <span><i class="fas fa-gas-pump"></i> Cheapest fuel today</span>
+                <span class="updated-wrap">
+                    <span id="updated-label" class="updated-label"></span>
+                    <button id="refresh-btn" class="text-btn" type="button"><i class="fas fa-rotate"></i> Refresh</button>
+                </span>
+            </div>
+            <div id="region-chips" class="chips" role="tablist" aria-label="Region"></div>
+            <div id="status" class="status-message">Loading fuel prices&hellip;</div>
+            <div id="fuel-grid" class="fuel-grid"></div>
+            <p class="source-note">Prices in cents per litre. Source: <a href="https://projectzerothree.info" target="_blank" rel="noopener noreferrer">projectzerothree.info</a>, refreshed by the portal every 15 minutes.</p>
+        </section>
+    </main>
 
-        function renderTable(region, page) {
-            // Always clear any previous error message
-            document.getElementById('fuel-table').innerHTML = '';
-            if (!fuelData) {
-                return;
-            }
-            const regionPages = groupedRegions[region];
-            if (!regionPages || !regionPages[page]) {
-                document.getElementById('fuel-table').innerHTML = '<p class="status-message">No data for this region.</p>';
-                paginationDiv.innerHTML = '';
-                return;
-            }
-            const regionData = regionPages[page];
-            let html = `<table><thead><tr><th>Name</th><th>Type</th><th>Price</th><th>Suburb</th><th>State</th><th>Postcode</th></tr></thead><tbody>`;
-            for (const price of regionData.prices) {
-                html += `<tr><td>${price.name}</td><td>${price.type}</td><td class="price">${price.price}</td><td>${price.suburb}</td><td>${price.state}</td><td>${price.postcode}</td></tr>`;
-            }
-            html += '</tbody></table>';
-            document.getElementById('fuel-table').innerHTML = html;
-            renderPagination(region, page, regionPages.length);
-        }
-
-        function renderPagination(region, page, totalPages) {
-            if (totalPages <= 1) {
-                paginationDiv.innerHTML = '';
-                return;
-            }
-            let html = '';
-            html += `<button id="prev-page" ${page === 0 ? 'disabled' : ''}>&lt; Prev</button>`;
-            html += ` <span>Page ${page + 1} of ${totalPages}</span> `;
-            html += `<button id="next-page" ${page === totalPages - 1 ? 'disabled' : ''}>Next &gt;</button>`;
-            paginationDiv.innerHTML = html;
-            document.getElementById('prev-page').onclick = function() {
-                if (currentPage > 0) {
-                    currentPage--;
-                    renderTable(currentRegion, currentPage);
-                }
-            };
-            document.getElementById('next-page').onclick = function() {
-                if (currentPage < totalPages - 1) {
-                    currentPage++;
-                    renderTable(currentRegion, currentPage);
-                }
-            };
-        }
-
-        function populateRegions() {
-            regionSelect.innerHTML = '';
-            for (const region in groupedRegions) {
-                const opt = document.createElement('option');
-                opt.value = region;
-                opt.textContent = region;
-                regionSelect.appendChild(opt);
-            }
-            // Default to NSW if available
-            if ([...regionSelect.options].some(o => o.value === 'NSW')) {
-                regionSelect.value = 'NSW';
-            }
-            currentRegion = regionSelect.value;
-            currentPage = 0;
-            renderTable(currentRegion, currentPage);
-        }
-
-        document.getElementById('region').addEventListener('change', function() {
-            // Only allow changing region if data is loaded
-            if (!fuelData) return;
-            document.getElementById('fuel-table').innerHTML = '';
-            currentRegion = this.value;
-            currentPage = 0;
-            renderTable(currentRegion, currentPage);
-        });
-
-        fetch(apiUrl)
-            .then(res => res.json())
-            .then(data => {
-                fuelData = data;
-                groupRegions();
-                populateRegions();
-                regionSelect.disabled = false;
-                paginationDiv.style.display = '';
-            })
-            .catch(() => {
-                document.getElementById('fuel-table').innerHTML = '<p class="status-message error">Failed to fetch fuel prices.</p>';
-                regionSelect.disabled = true;
-                paginationDiv.style.display = 'none';
-            });
-    </script>
+    <script src="theme.js" defer></script>
+    <script src="fuel.js" defer></script>
 </body>
 </html>

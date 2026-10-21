@@ -1,0 +1,99 @@
+/* Shared styles for the Fuel and HW price pages (on top of base.css). */
+
+.brand { color: inherit; text-decoration: none; }
+.tagline i { font-size: 0.7em; margin: 0 0.25rem; }
+
+.toolbar-row { justify-content: space-between; flex-wrap: wrap; }
+.toolbar-row > span:first-child { display: flex; align-items: center; gap: 0.5rem; }
+.updated-wrap { display: flex; align-items: center; gap: 0.75rem; font-weight: normal; font-size: 0.875rem; flex-wrap: wrap; }
+.updated-label { color: var(--muted); }
+.text-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 0.95rem;
+    cursor: pointer;
+    padding: 0.5rem 0.25rem;
+}
+.text-btn:hover { color: var(--brand-dark); text-decoration: underline; }
+.text-btn:disabled { opacity: 0.5; cursor: wait; }
+
+/* ---------- chips (region / category / filters) ---------- */
+.chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+.chips.small { margin-bottom: 0; gap: 0.4rem; }
+.chip {
+    min-height: 2.75rem;
+    padding: 0.4rem 1.1rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--tile-bg);
+    color: var(--text);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.chips.small .chip { min-height: 2.25rem; padding: 0.25rem 0.85rem; font-size: 0.9rem; font-weight: normal; }
+.chip:hover { background: var(--tile-hover); color: #fff; }
+.chip.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+html.dark-mode .chip:hover, html.dark-mode .chip.active { color: #1a1a1a; }
+html.dark-mode .chip.active { background: #f0b33e; border-color: #f0b33e; }
+
+.status-message { text-align: center; color: var(--muted); padding: 2rem 0; }
+.status-message.error { color: var(--danger); }
+.source-note { color: var(--muted); font-size: 0.875rem; margin: 1rem 0 0; }
+.source-note a, td a { color: var(--info); }
+
+/* ---------- fuel ---------- */
+.fuel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 1rem; }
+.fuel-card { background: var(--tile-bg); border-radius: 0.5rem; padding: 1rem 1.1rem; }
+.fuel-type { font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.875rem; }
+.fuel-price { font-size: 2.6rem; font-weight: 800; line-height: 1.1; margin-top: 0.15rem; color: var(--brand-dark); }
+html.dark-mode .fuel-price { color: #f8c146; }
+.fuel-unit { font-size: 1rem; font-weight: 600; color: var(--muted); margin-left: 0.3rem; }
+.fuel-station { font-weight: 600; margin-top: 0.15rem; }
+.fuel-others { list-style: none; margin: 0.75rem 0 0; padding: 0.6rem 0 0; border-top: 1px solid var(--border); }
+.fuel-others li { display: flex; justify-content: space-between; gap: 0.75rem; font-size: 0.9rem; color: var(--muted); padding: 0.15rem 0; }
+.fuel-other-price { font-weight: 700; white-space: nowrap; color: var(--text); }
+
+/* ---------- hardware ---------- */
+.search-row { margin-bottom: 0.75rem; }
+.search-row input {
+    width: 100%;
+    font-size: 1rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 0.25rem;
+    background: var(--panel);
+    color: var(--text);
+}
+.search-row input:focus { outline: none; border-color: var(--brand); }
+.filter-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
+.filter-name { font-weight: 700; color: var(--muted); min-width: 3.5rem; font-size: 0.9rem; }
+.count-label { color: var(--muted); font-size: 0.9rem; margin: 0.5rem 0; }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+td:first-child { white-space: normal; min-width: 12rem; }
+th { padding: 0; }
+.sort-btn {
+    width: 100%;
+    text-align: left;
+    padding: 0.6rem 0.75rem;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.sort-btn:hover { color: var(--brand-dark); }
+tbody tr:hover { background: rgba(221, 168, 75, 0.12); }
+.price-col { font-weight: 700; }
+td.price-col { color: var(--brand-dark); }
+html.dark-mode td.price-col { color: #f8c146; }
+
+@media (max-width: 600px) {
+    .fuel-price { font-size: 2.2rem; }
+}
