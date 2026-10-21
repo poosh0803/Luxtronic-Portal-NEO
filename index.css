@@ -102,7 +102,7 @@ html.dark-mode .brand-name { color: #f8c146; }
 }
 .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: 20px;
 }
 
@@ -125,6 +125,8 @@ html.dark-mode .brand-name { color: #f8c146; }
 html.dark-mode .box-title i { color: #f8c146; }
 
 .tiles { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.box-wide { grid-column: span 2; }
+.box-wide .tiles { grid-template-columns: repeat(2, 1fr); }
 .tile {
     display: flex;
     align-items: center;
@@ -204,6 +206,13 @@ html.dark-mode .notif-link { color: #1a1a1a; background: #f0b33e; }
 .notif-delete:hover { color: var(--danger); }
 .notif-empty { padding: 20px 0; text-align: center; color: var(--muted); }
 
+@media (max-width: 900px) {
+    .grid { grid-template-columns: repeat(2, 1fr); }
+}
+
 @media (max-width: 600px) {
+    .grid { grid-template-columns: 1fr; }
+    .box-wide { grid-column: auto; }
+    .box-wide .tiles { grid-template-columns: 1fr; }
     .page { padding: 16px 12px 40px; }
 }
