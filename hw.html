@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HW Price</title>
+    <link rel="stylesheet" href="hw.css">
+    <link rel="icon" type="image/png" href="icons/luxtronic.png">
+</head>
+<body>
+    <div class="container">
+        <a class="back-link" href="index.html">&larr; Back to Portal</a>
+        <h1>HW Price</h1>
+        <p class="subtitle">Hardware prices from <a href="https://www.pgrid.app/au" target="_blank">PGrid Australia</a></p>
+        <div class="tab-bar" id="tabs"></div>
+        <div class="search-bar">
+            <input type="search" id="search-input" placeholder="Search…" autocomplete="off">
+        </div>
+        <div class="toolbar">
+            <span id="updated-label"></span>
+            <button class="refresh-btn" id="refresh-btn">Refresh</button>
+        </div>
+        <div class="table-wrap">
+            <div id="hw-table"><p class="status-message">Loading&hellip;</p></div>
+        </div>
+        <p class="disclaimer">PGrid doesn't provide a public API, so this page fetches their page through a public proxy and reads the price table. It may occasionally be slow or unavailable &mdash; use the link above to view pgrid.app directly.</p>
+    </div>
+    <script>
+    const CATEGORIES = {
+        gpu: { label: 'GPU', path: '/au/gpus' },
+        ram: { label: 'RAM', path: '/au/rams' },
+        ssd: { label: 'SSD', path: '/au/ssds' },
+    };
+    const PGRID_ORIGIN = 'https://www.pgrid.app';
+
+    const cache = {};
+    let currentCategory = 'gpu';
+    let searchQuery = '';
+
+    const tabsDiv = document.getElementById('tabs');
+    const tableDiv = document.getElementById('hw-table');
+    const updatedLabel = document.getElementById('updated-label');
+    const refreshBtn = document.getElementById('refresh-btn');
+    const searchInput = document.getElementById('search-input');
+
+    function renderTabs() {
+        tabsDiv.innerHTML = '';
+        for (const key in CATEGORIES) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = CATEGORIES[key].label;
+            btn.className = 'tab-btn' + (key === currentCategory ? ' active' : '');
+            btn.addEventListener('click', () => selectCategory(key));
+            tabsDiv.appendChild(btn);
+        }
+    }
+
+    function setStatus(message, isError) {
+        tableDiv.innerHTML = '';
+        const p = document.createElement('p');
+        p.className = 'status-message' + (isError ? ' error' : '');
+        p.textContent = message;
+        tableDiv.appendChild(p);
+    }
+
+    async function fetchWithTimeout(url, timeoutMs, options) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            return await fetch(url, Object.assign({}, options, { signal: controller.signal }));
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
+    async function fetchPageHtml(path) {
+        const target = PGRID_ORIGIN + path;
+
+        // Primary: Jina AI Reader, asked to return cleaned-but-intact HTML.
+        try {
+            const res = await fetchWithTimeout('https://r.jina.ai/' + target, 12000, { headers: { 'X-Return-Format': 'html' } });
+            if (res.ok) {
+                const text = await res.text();
+                if (text && text.length > 2000) return text;
+            }
+        } catch (e) { /* fall through to backup proxy */ }
+
+        // Backup: allorigins raw passthrough.
+        try {
+            const res = await fetchWithTimeout('https://api.allorigins.win/raw?url=' + encodeURIComponent(target), 12000);
+            if (res.ok) {
+                const text = await res.text();
+                if (text && text.length > 2000) return text;
+            }
+        } catch (e) { /* fall through to backup proxy */ }
+
+        // Backup: allorigins JSON-wrapped passthrough.
+        const res2 = await fetchWithTimeout('https://api.allorigins.win/get?url=' + encodeURIComponent(target), 12000);
+        if (!res2.ok) throw new Error('Proxy request failed (' + res2.status + ')');
+        const data = await res2.json();
+        if (!data || !data.contents || data.contents.length < 2000) throw new Error('Proxy returned no data');
+        return data.contents;
+    }
+
+    function cellText(el) {
+        // Adjacent leaf elements (e.g. brand + model spans) have no whitespace
+        // between them in the source markup, so join their text with a space.
+        const parts = [];
+        (function walk(node) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                const t = node.textContent.replace(/\s+/g, ' ').trim();
+                if (t) parts.push(t);
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                if (node.tagName === 'SVG' || node.childNodes.length === 0) return;
+                for (const child of node.childNodes) walk(child);
+            }
+        })(el);
+        return parts.join(' ');
+    }
+
+    function parsePriceTable(html) {
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        let best = null;
+        for (const table of doc.querySelectorAll('table')) {
+            const headerRow = table.querySelector('thead tr');
+            if (!headerRow) continue;
+            const headers = [...headerRow.querySelectorAll('th')]
+                .map(th => th.textContent.trim())
+                .filter(Boolean);
+            const priceIdx = headers.findIndex(h => h.toLowerCase() === 'price');
+            if (priceIdx === -1) continue;
+
+            const rows = [...table.querySelectorAll('tbody tr')]
+                .map(tr => {
+                    const cells = [...tr.children];
+                    if (cells.length < headers.length) return null;
+                    const link = cells[0].querySelector('a[href]');
+                    return {
+                        values: cells.map(td => cellText(td)),
+                        href: link ? link.getAttribute('href') : null,
+                    };
+                })
+                .filter(Boolean);
+
+            if (!best || rows.length > best.rows.length) {
+                best = { headers, priceIdx, rows };
+            }
+        }
+        return best && best.rows.length ? best : null;
+    }
+
+    function parsePrice(text) {
+        const match = text.replace(/,/g, '').match(/\$([\d.]+)/);
+        return match ? parseFloat(match[1]) : null;
+    }
+
+    function renderTable(parsed) {
+        if (!parsed) {
+            setStatus('No price data found.', true);
+            return;
+        }
+        const query = searchQuery.trim().toLowerCase();
+        const filteredRows = query
+            ? parsed.rows.filter(row => row.values.join(' ').toLowerCase().includes(query))
+            : parsed.rows;
+
+        if (!filteredRows.length) {
+            setStatus('No results for "' + searchQuery.trim() + '".', false);
+            return;
+        }
+
+        const sortedRows = [...filteredRows].sort((a, b) => {
+            const pa = parsePrice(a.values[parsed.priceIdx]);
+            const pb = parsePrice(b.values[parsed.priceIdx]);
+            if (pa === null && pb === null) return 0;
+            if (pa === null) return 1;
+            if (pb === null) return -1;
+            return pa - pb;
+        });
+
+        const table = document.createElement('table');
+        const thead = document.createElement('thead');
+        const headRow = document.createElement('tr');
+        parsed.headers.forEach((h, i) => {
+            const th = document.createElement('th');
+            th.textContent = h;
+            if (i === parsed.priceIdx) th.classList.add('price-col');
+            headRow.appendChild(th);
+        });
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        for (const row of sortedRows) {
+            const tr = document.createElement('tr');
+            row.values.forEach((value, i) => {
+                const td = document.createElement('td');
+                if (i === parsed.priceIdx) td.classList.add('price-col');
+                if (i === 0 && row.href) {
+                    const a = document.createElement('a');
+                    a.href = PGRID_ORIGIN + row.href;
+                    a.target = '_blank';
+                    a.rel = 'noopener noreferrer';
+                    a.textContent = value;
+                    td.appendChild(a);
+                } else {
+                    td.textContent = value;
+                }
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        }
+        table.appendChild(tbody);
+
+        tableDiv.innerHTML = '';
+        tableDiv.appendChild(table);
+    }
+
+    async function loadCategory(key, force) {
+        if (!force && cache[key]) {
+            renderTable(cache[key].data);
+            updatedLabel.textContent = 'Updated ' + cache[key].time.toLocaleTimeString();
+            return;
+        }
+        setStatus('Loading ' + CATEGORIES[key].label + ' prices…', false);
+        updatedLabel.textContent = '';
+        refreshBtn.disabled = true;
+        try {
+            const html = await fetchPageHtml(CATEGORIES[key].path);
+            const parsed = parsePriceTable(html);
+            if (!parsed) throw new Error('Could not find a price table on the page');
+            cache[key] = { data: parsed, time: new Date() };
+            if (currentCategory === key) {
+                renderTable(parsed);
+                updatedLabel.textContent = 'Updated ' + cache[key].time.toLocaleTimeString();
+            }
+        } catch (err) {
+            if (currentCategory === key) {
+                setStatus('Could not load ' + CATEGORIES[key].label + ' prices right now. The proxy service may be temporarily unavailable — try refreshing in a moment.', true);
+            }
+        } finally {
+            refreshBtn.disabled = false;
+        }
+    }
+
+    function selectCategory(key) {
+        currentCategory = key;
+        renderTabs();
+        loadCategory(key, false);
+    }
+
+    refreshBtn.addEventListener('click', () => loadCategory(currentCategory, true));
+
+    searchInput.addEventListener('input', () => {
+        searchQuery = searchInput.value;
+        if (cache[currentCategory]) {
+            renderTable(cache[currentCategory].data);
+        }
+    });
+
+    renderTabs();
+    loadCategory(currentCategory, false);
+    </script>
+</body>
+</html>
