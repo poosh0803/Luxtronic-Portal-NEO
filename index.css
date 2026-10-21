@@ -221,9 +221,10 @@ html.dark-mode .notif-link { color: #1a1a1a; background: #f0b33e; }
     .page { padding: 1rem 0.75rem 2.5rem; }
 }
 
-/* Sizes are in rem. On 1080p-and-up desktop monitors the whole page scales to
-   90% (what staff were doing by hand with browser zoom); phones and small
+/* Sizes are in rem. On desktop-width screens (1200px+ CSS width, which includes
+   1080p monitors with 125% Windows scaling) the whole page scales to
+   90% so it reads right at 100% browser zoom; phones and small
    laptops keep full size for readability and touch targets. */
-@media (min-width: 1600px) {
+@media (min-width: 1200px) {
     html { font-size: 90%; }
 }
